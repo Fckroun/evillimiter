@@ -5,20 +5,29 @@ import argparse
 import platform
 import collections
 import pkg_resources
+import readline
+import atexit
 
 import evillimiter.networking.utils as netutils
 from evillimiter.menus.main_menu import MainMenu
 from evillimiter.console.banner import get_main_banner
 from evillimiter.console.io import IO
 
-
 InitialArguments = collections.namedtuple('InitialArguments', 'interface, gateway_ip, netmask, gateway_mac')
 
+HISTORY_FILE = os.path.expanduser("~/.evillimiter_history")
+
+def setup_history():
+    """Sets up command history for the interactive shell."""
+    try:
+        readline.read_history_file(HISTORY_FILE)
+    except FileNotFoundError:
+        pass
+    atexit.register(readline.write_history_file, HISTORY_FILE)
 
 def get_init_content():
     with open(os.path.join(os.path.abspath(os.path.dirname(__file__)), '__init__.py'), 'r') as f:
         return f.read()
-
 
 def get_version():
     version_match = re.search(r'^__version__ = [\'"](\d\.\d\.\d)[\'"]', get_init_content(), re.M)
@@ -27,7 +36,6 @@ def get_version():
     
     raise RuntimeError('Unable to locate version string.')
 
-
 def get_description():
     desc_match = re.search(r'^__description__ = [\'"]((.)*)[\'"]', get_init_content(), re.M)
     if desc_match:
@@ -35,14 +43,11 @@ def get_description():
     
     raise RuntimeError('Unable to locate description string.')
 
-
 def is_privileged():
     return os.geteuid() == 0
 
-
 def is_linux():
     return platform.system() == 'Linux'
-
 
 def parse_arguments():
     """
@@ -58,7 +63,6 @@ def parse_arguments():
     parser.add_argument('--colorless', action='store_true', help='disable colored output.')
 
     return parser.parse_args()
-
 
 def process_arguments(args):
     """
@@ -120,7 +124,6 @@ def process_arguments(args):
 
     return InitialArguments(interface=interface, gateway_ip=gateway_ip, gateway_mac=gateway_mac, netmask=netmask)
 
-
 def initialize(interface):
     """
     Sets up requirements, e.g. IP-Forwarding, 3rd party applications
@@ -137,14 +140,12 @@ def initialize(interface):
 
     return True
 
-
 def cleanup(interface):
     """
     Resets what has been initialized
     """
     netutils.delete_qdisc_root(interface)
     netutils.disable_ip_forwarding()
-
 
 def run():
     """
@@ -164,6 +165,8 @@ def run():
         IO.error('run as root.')
         return
 
+    setup_history()  # Enable command history
+
     args = process_arguments(args)
 
     if args is None:
@@ -174,7 +177,6 @@ def run():
         menu = MainMenu(version, args.interface, args.gateway_ip, args.gateway_mac, args.netmask)
         menu.start()
         cleanup(args.interface)
-
 
 if __name__ == '__main__':
     run()
